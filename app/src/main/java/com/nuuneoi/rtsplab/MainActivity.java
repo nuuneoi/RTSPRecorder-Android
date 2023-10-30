@@ -16,6 +16,7 @@ import android.widget.Button;
 
 import com.alexvas.rtsp.RtspClient;
 import com.alexvas.utils.NetUtils;
+import com.pedro.rtmp.utils.ConnectCheckerRtmp;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,16 +30,22 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends AppCompatActivity {
 
-    String rtspUrl = "";
+    String rtspSourceUrl = "";
+    String rtmpBroadcastUrl = "";
+
     int rtspVideoWidth = 1280;
     int rtspVideoHeight = 720;
     String recordingOutputDir = "IPCameraRecorder";
 
     RtspRecorder rtspRecorder;
+    RtmpStreamer rtmpStreamer;
 
     Button btnStartRecording;
     Button btnStopRecording;
     Button btnRecordToNewFile;
+
+    Button btnStartStreaming;
+    Button btnStopStreaming;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,6 +55,9 @@ public class MainActivity extends AppCompatActivity {
         btnStartRecording = (Button) findViewById(R.id.btnStartRecording);
         btnStopRecording = (Button) findViewById(R.id.btnStopRecording);
         btnRecordToNewFile = (Button) findViewById(R.id.btnRecordToNewFile);
+
+        btnStartStreaming = (Button) findViewById(R.id.btnStartStreaming);
+        btnStopStreaming = (Button) findViewById(R.id.btnStopStreaming);
 
         btnStartRecording.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -76,14 +86,35 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        btnStartStreaming.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                btnStartStreaming.setVisibility(View.GONE);
+                btnStopStreaming.setVisibility(View.VISIBLE);
+                rtmpStreamer.startStreaming(rtmpBroadcastUrl, false);
+            }
+        });
+
+        btnStopStreaming.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                btnStartStreaming.setVisibility(View.VISIBLE);
+                btnStopStreaming.setVisibility(View.GONE);
+                rtmpStreamer.stopStreaming();
+            }
+        });
+
         rtspRecorder = new RtspRecorder();
+        rtmpStreamer = new RtmpStreamer();
+        rtmpStreamer.setConnectCheckerRtmpListener(rtmpConnectionListner);
+        rtmpStreamer.setInputSource(rtspRecorder);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
 
-        rtspRecorder.startStreaming(rtspUrl);
+        rtspRecorder.startStreaming(rtspSourceUrl);
     }
 
     @Override
@@ -92,4 +123,45 @@ public class MainActivity extends AppCompatActivity {
 
         rtspRecorder.stopStreaming();
     }
+
+    ConnectCheckerRtmp rtmpConnectionListner = new ConnectCheckerRtmp() {
+        @Override
+        public void onConnectionStartedRtmp(@NonNull String s) {
+
+        }
+
+        @Override
+        public void onConnectionSuccessRtmp() {
+
+        }
+
+        @Override
+        public void onConnectionFailedRtmp(@NonNull String s) {
+            btnStartStreaming.setVisibility(View.VISIBLE);
+            btnStopStreaming.setVisibility(View.GONE);
+            rtmpStreamer.stopStreaming();
+        }
+
+        @Override
+        public void onNewBitrateRtmp(long l) {
+
+        }
+
+        @Override
+        public void onDisconnectRtmp() {
+            btnStartStreaming.setVisibility(View.VISIBLE);
+            btnStopStreaming.setVisibility(View.GONE);
+            rtmpStreamer.stopStreaming();
+        }
+
+        @Override
+        public void onAuthErrorRtmp() {
+
+        }
+
+        @Override
+        public void onAuthSuccessRtmp() {
+
+        }
+    };
 }

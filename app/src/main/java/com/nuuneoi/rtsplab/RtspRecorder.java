@@ -24,6 +24,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class RtspRecorder {
 
+    interface RtspListener {
+        void onRtspVideoDataReceived(@NonNull ByteBuffer byteBuf, @NonNull MediaCodec.BufferInfo bufferInfo);
+        void onRtspAudioDataReceived(@NonNull ByteBuffer byteBuf, @NonNull MediaCodec.BufferInfo bufferInfo);
+    }
+
     private static boolean DEBUG = false;
     private static String TAG = "RtspRecorder";
 
@@ -49,6 +54,12 @@ public class RtspRecorder {
 
     private String recordingOutputFilePath;
     private String recordingOutputDir;
+
+    private RtspListener mRtspListener;
+
+    public void setRtspListener(RtspListener listener) {
+        mRtspListener = listener;
+    }
 
     public void startStreaming(String url) {
         isStreaming = true;
@@ -134,6 +145,30 @@ public class RtspRecorder {
         }
     }
 
+    public byte[] getSps() {
+        return sps;
+    }
+
+    public byte[] getPps() {
+        return pps;
+    }
+
+    public int getVideoWidth() {
+        return videoWidth;
+    }
+
+    public int getVideoHeight() {
+        return videoHeight;
+    }
+
+    public int getAudioSampleRateHz() {
+        return audioSampleRateHz;
+    }
+
+    public int getAudioChannels() {
+        return audioChannels;
+    }
+
     private RtspClient.RtspClientListener rtspClientListener = new RtspClient.RtspClientListener() {
         private String TAG = "RtspClientListener";
 
@@ -157,10 +192,15 @@ public class RtspRecorder {
         public void onRtspVideoNalUnitReceived(@NonNull byte[] data, int offset, int length, long timestamp) {
             if (DEBUG) Log.d(TAG, "onRtspVideoNalUnitReceived");
 
+            boolean isKeyFrame = (data[4] & 0x1f) == 5;
+            MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+            bufferInfo.presentationTimeUs = timestamp;
+            bufferInfo.flags = isKeyFrame ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0;
+            bufferInfo.size = length;
+            ByteBuffer encodedData = ByteBuffer.wrap(data, offset, length);
+
             synchronized (isRecording) {
                 if (isRecording) {
-                    boolean isKeyFrame = (data[4] & 0x1f) == 5;
-
                     // Smooth record to the new file
                     if (isNewFileRequested && isKeyFrame) {
                         releaseMuxer();
@@ -170,32 +210,34 @@ public class RtspRecorder {
                     if (mediaMuxer == null)
                         initializeMuxer();
 
-                    MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
-                    bufferInfo.presentationTimeUs = timestamp;
-                    bufferInfo.flags = isKeyFrame ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0;
-                    bufferInfo.size = length;
-                    ByteBuffer encodedData = ByteBuffer.wrap(data, offset, length);
                     mediaMuxer.writeSampleData(0, encodedData, bufferInfo);
                 }
             }
+
+            if (mRtspListener != null)
+                mRtspListener.onRtspVideoDataReceived(encodedData, bufferInfo);
         }
 
         @Override
         public void onRtspAudioSampleReceived(@NonNull byte[] data, int offset, int length, long timestamp) {
             if (DEBUG) Log.d(TAG, "onRtspAudioSampleReceived");
 
+            MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+            bufferInfo.presentationTimeUs = timestamp;
+            bufferInfo.size = length;
+            ByteBuffer encodedData = ByteBuffer.wrap(data, offset, length);
+
             synchronized (isRecording) {
                 if (isRecording) {
                     if (mediaMuxer == null)
                         initializeMuxer();
 
-                    MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
-                    bufferInfo.presentationTimeUs = timestamp;
-                    bufferInfo.size = length;
-                    ByteBuffer encodedData = ByteBuffer.wrap(data, offset, length);
                     mediaMuxer.writeSampleData(1, encodedData, bufferInfo);
                 }
             }
+
+            if (mRtspListener != null)
+                mRtspListener.onRtspAudioDataReceived(encodedData, bufferInfo);
         }
 
         @Override

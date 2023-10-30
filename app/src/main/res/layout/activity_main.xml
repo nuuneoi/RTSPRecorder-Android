@@ -37,4 +37,24 @@
         android:text="Record to New File"
         android:visibility="gone" />
 
+
+    <Button
+        android:id="@+id/btnStartStreaming"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="16dp"
+        android:backgroundTint="#00A600"
+        android:text="Start Streaming" />
+
+    <Button
+        android:id="@+id/btnStopStreaming"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="16dp"
+        android:backgroundTint="#A60048"
+        android:text="Stop Streaming"
+        android:visibility="gone" />
+
 </RelativeLayout>
